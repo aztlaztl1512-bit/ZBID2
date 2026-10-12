@@ -23,15 +23,29 @@
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th { background: var(--maroon); color: var(--gold); padding: 12px; }
-        td { border-bottom: 1px solid #eee; padding: 10px; text-align: center; }
+        td { border-bottom: 1px solid #eee; padding: 10px; text-align: center; vertical-align: middle; }
         
         .btn-approve { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-reject { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
-        .cell-content { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
-        .btn-sm { padding: 4px 8px; font-size: 0.85rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
-        .btn-copy-sm { background: var(--info); }
-        .btn-edit-sm { background: var(--warning); }
+        /* تنسيق القائمة المنسدلة للعمليات */
+        .action-select {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #b0bec5;
+            background-color: #f8f9fa;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--maroon);
+            cursor: pointer;
+            outline: none;
+            transition: 0.2s;
+        }
+        .action-select:hover {
+            border-color: var(--maroon);
+            background-color: #fff;
+        }
 
         .stats-bar { display: flex; justify-content: space-between; background: #e9ecef; padding: 15px; border-radius: 8px; font-weight: bold; color: var(--maroon); font-size: 1.1rem; margin-bottom: 15px; }
         .search-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 10px; }
@@ -91,7 +105,7 @@
             <tr>
                 <th>الاسم</th>
                 <th>البريد الإلكتروني</th>
-                <th>الإجراء</th>
+                <th>الإجراءات</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -131,30 +145,21 @@
                 tr.setAttribute('data-email', email);
 
                 tr.innerHTML = `
+                    <td class="name-cell"></td>
+                    <td class="email-cell"></td>
                     <td>
-                        <div class="cell-content">
-                            <span class="name-text"></span>
-                            <div>
-                                <button class="btn-sm btn-copy-sm btn-copy-name" title="نسخ الاسم">📋 نسخ</button>
-                                <button class="btn-sm btn-edit-sm btn-edit-name" title="تعديل الاسم">✏️ تعديل</button>
-                            </div>
-                        </div>
+                        <select class="action-select" onchange="handleAction(this, '${email}', '${name.replace(/'/g, "\\'")}')">
+                            <option value="" disabled selected>⚙️ خيارات الإجراء</option>
+                            <option value="copy_name">📋 نسخ الاسم</option>
+                            <option value="copy_email">📧 نسخ الإيميل</option>
+                            <option value="edit">✏️ تعديل الاسم</option>
+                            <option value="delete">🗑️ حذف الطالب</option>
+                        </select>
                     </td>
-                    <td>
-                        <div class="cell-content">
-                            <span class="email-text"></span>
-                            <button class="btn-sm btn-copy-sm btn-copy-email" title="نسخ الإيميل">📋 نسخ</button>
-                        </div>
-                    </td>
-                    <td><button class="btn-reject" onclick="deleteAllowed('${email}')">🗑️ حذف</button></td>
                 `;
 
-                tr.querySelector('.name-text').textContent = name;
-                tr.querySelector('.email-text').textContent = email;
-                
-                tr.querySelector('.btn-copy-name').onclick = () => copyText(name);
-                tr.querySelector('.btn-copy-email').onclick = () => copyText(email);
-                tr.querySelector('.btn-edit-name').onclick = () => editStudentName(email, name);
+                tr.querySelector('.name-cell').textContent = name;
+                tr.querySelector('.email-cell').textContent = email;
 
                 approvedTbody.appendChild(tr);
             });
@@ -182,6 +187,22 @@
                     </tr>`;
             });
         });
+    }
+
+    // إدارة اختيار القائمة المنسدلة
+    function handleAction(selectElement, email, currentName) {
+        const action = selectElement.value;
+        selectElement.value = ""; // إرجاع القائمة للخيار الافتراضي فوراً
+
+        if (action === 'copy_name') {
+            copyText(currentName);
+        } else if (action === 'copy_email') {
+            copyText(email);
+        } else if (action === 'edit') {
+            editStudentName(email, currentName);
+        } else if (action === 'delete') {
+            deleteAllowed(email);
+        }
     }
 
     async function copyText(text) {
