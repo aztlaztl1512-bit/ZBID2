@@ -129,7 +129,7 @@
         const pendingTbody = document.querySelector("#pendingTable tbody");
         const pendingSection = document.getElementById("pendingSection");
 
-        // 1. مراقبة جدول الطلاب المعتمدين
+        // 1. مراقبة جدول الطلاب المعتمدين[span_1](start_span)[span_1](end_span)
         db.collection("allowed_students").orderBy("name").onSnapshot((snapshot) => {
             let approvedCount = snapshot.size;
             approvedTbody.innerHTML = "";
@@ -150,9 +150,11 @@
                     <td>
                         <select class="action-select" onchange="handleAction(this, '${email}', '${name.replace(/'/g, "\\'")}')">
                             <option value="" disabled selected>⚙️ خيارات الإجراء</option>
-                            <option value="copy_name">📋 نسخ الاسم</option>
                             <option value="copy_email">📧 نسخ الإيميل</option>
-                            <option value="edit">✏️ تعديل الاسم</option>
+                            <option value="edit_email">✏️ تعديل الإيميل</option>
+                            <option value="copy_name">📋 نسخ الاسم</option>
+                            <option value="edit_name">✏️ تعديل الاسم</option>
+                            <option value="copy_both">📑 نسخ الكل (الاسم والإيميل)</option>
                             <option value="delete">🗑️ حذف الطالب</option>
                         </select>
                     </td>
@@ -166,7 +168,7 @@
             searchStudents();
         });
 
-        // 2. مراقبة جدول الطلبات المعلقة
+        // 2. مراقبة جدول الطلبات المعلقة[span_2](start_span)[span_2](end_span)
         db.collection("pending_students").orderBy("name").onSnapshot((snapshot) => {
             let pendingCount = snapshot.size;
             pendingTbody.innerHTML = "";
@@ -189,17 +191,21 @@
         });
     }
 
-    // إدارة اختيار القائمة المنسدلة
+    // إدارة اختيار القائمة المنسدلة بالترتيب المطلوب[span_3](start_span)[span_3](end_span)
     function handleAction(selectElement, email, currentName) {
         const action = selectElement.value;
         selectElement.value = ""; // إرجاع القائمة للخيار الافتراضي فوراً
 
-        if (action === 'copy_name') {
-            copyText(currentName);
-        } else if (action === 'copy_email') {
+        if (action === 'copy_email') {
             copyText(email);
-        } else if (action === 'edit') {
+        } else if (action === 'edit_email') {
+            editStudentEmail(email, currentName);
+        } else if (action === 'copy_name') {
+            copyText(currentName);
+        } else if (action === 'edit_name') {
             editStudentName(email, currentName);
+        } else if (action === 'copy_both') {
+            copyText(`${currentName}\n${email}`);
         } else if (action === 'delete') {
             deleteAllowed(email);
         }
@@ -213,6 +219,7 @@
         }
     }
 
+    // دالة تعديل اسم الطالب
     async function editStudentName(email, currentName) {
         const newName = prompt("أدخل الاسم الجديد للطالب:", currentName);
         if (newName === null) return;
@@ -228,6 +235,38 @@
             });
         } catch (error) {
             alert("حدث خطأ أثناء تحديث الاسم.");
+        }
+    }
+
+    // دالة تعديل البريد الإلكتروني للطالب
+    async function editStudentEmail(currentEmail, currentName) {
+        const newEmailInput = prompt("أدخل البريد الإلكتروني الجديد للطالب:", currentEmail);
+        if (newEmailInput === null) return;
+        const newEmail = newEmailInput.trim().toLowerCase();
+
+        if (!newEmail || !newEmail.includes('@')) {
+            alert("يرجى إدخال بريد إلكتروني صحيح.");
+            return;
+        }
+
+        if (newEmail === currentEmail) return;
+
+        try {
+            const docCheck = await db.collection("allowed_students").doc(newEmail).get();
+            if (docCheck.exists) {
+                alert("هذا البريد الإلكتروني موجود مسبقاً لقالب طالب آخر!");
+                return;
+            }
+
+            await db.collection("allowed_students").doc(newEmail).set({
+                name: currentName,
+                added_at: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection("allowed_students").doc(currentEmail).delete();
+            alert("تم تعديل الإيميل بنجاح!");
+        } catch (error) {
+            alert("حدث خطأ أثناء تحديث الإيميل.");
         }
     }
 
