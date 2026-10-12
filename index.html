@@ -28,7 +28,6 @@
         .btn-approve { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-reject { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
-        /* تنسيقات الأزرار الجديدة داخل الجدول */
         .cell-content { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
         .btn-sm { padding: 4px 8px; font-size: 0.85rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
         .btn-copy-sm { background: var(--info); }
@@ -125,27 +124,39 @@
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 const email = doc.id;
-                const safeName = data.name.replace(/'/g, "\\'");
+                const name = data.name || "";
                 
-                approvedTbody.innerHTML += `
-                    <tr data-name="${data.name}" data-email="${email}">
-                        <td>
-                            <div class="cell-content">
-                                <span>${data.name}</span>
-                                <div>
-                                    <button class="btn-sm btn-copy-sm" onclick="copyText('${safeName}')" title="نسخ الاسم">📋 نسخ</button>
-                                    <button class="btn-sm btn-edit-sm" onclick="editStudentName('${email}', '${safeName}')" title="تعديل الاسم">✏️ تعديل</button>
-                                </div>
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-name', name);
+                tr.setAttribute('data-email', email);
+
+                tr.innerHTML = `
+                    <td>
+                        <div class="cell-content">
+                            <span class="name-text"></span>
+                            <div>
+                                <button class="btn-sm btn-copy-sm btn-copy-name" title="نسخ الاسم">📋 نسخ</button>
+                                <button class="btn-sm btn-edit-sm btn-edit-name" title="تعديل الاسم">✏️ تعديل</button>
                             </div>
-                        </td>
-                        <td>
-                            <div class="cell-content">
-                                <span>${email}</span>
-                                <button class="btn-sm btn-copy-sm" onclick="copyText('${email}')" title="نسخ الإيميل">📋 نسخ</button>
-                            </div>
-                        </td>
-                        <td><button class="btn-reject" onclick="deleteAllowed('${email}')">🗑️ حذف</button></td>
-                    </tr>`;
+                        </div>
+                    </td>
+                    <td>
+                        <div class="cell-content">
+                            <span class="email-text"></span>
+                            <button class="btn-sm btn-copy-sm btn-copy-email" title="نسخ الإيميل">📋 نسخ</button>
+                        </div>
+                    </td>
+                    <td><button class="btn-reject" onclick="deleteAllowed('${email}')">🗑️ حذف</button></td>
+                `;
+
+                tr.querySelector('.name-text').textContent = name;
+                tr.querySelector('.email-text').textContent = email;
+                
+                tr.querySelector('.btn-copy-name').onclick = () => copyText(name);
+                tr.querySelector('.btn-copy-email').onclick = () => copyText(email);
+                tr.querySelector('.btn-edit-name').onclick = () => editStudentName(email, name);
+
+                approvedTbody.appendChild(tr);
             });
             searchStudents();
         });
@@ -173,21 +184,17 @@
         });
     }
 
-    // دالة عامة لنسخ نص مفرد مع إشعار سريع
     async function copyText(text) {
         try {
             await navigator.clipboard.writeText(text);
-            // إشعار خفيف أو رسالة سريعة
-            console.log("تم النسخ: " + text);
         } catch (err) {
             alert("فشل النسخ تلقائياً.");
         }
     }
 
-    // دالة تعديل اسم الطالب
     async function editStudentName(email, currentName) {
         const newName = prompt("أدخل الاسم الجديد للطالب:", currentName);
-        if (newName === null) return; // تم إلغاء الأمر
+        if (newName === null) return;
         const trimmedName = newName.trim();
         if (!trimmedName) {
             alert("لا يمكن ترك الاسم فارغاً.");
@@ -198,13 +205,11 @@
             await db.collection("allowed_students").doc(email).update({
                 name: trimmedName
             });
-            // التحديث سيظهر فوراً عبر الـ onSnapshot
         } catch (error) {
             alert("حدث خطأ أثناء تحديث الاسم.");
         }
     }
 
-    // دالة قبول الطالب
     async function approveStudent(email, name) {
         try {
             await db.collection("allowed_students").doc(email).set({
@@ -217,21 +222,18 @@
         }
     }
 
-    // حذف طالب من المعلقين (رفض)
     async function deletePending(email) {
         if(confirm(`رفض وحذف ${email} من قائمة الانتظار؟`)) {
             await db.collection("pending_students").doc(email).delete();
         }
     }
 
-    // حذف طالب من المعتمدين
     async function deleteAllowed(email) {
         if(confirm(`حذف ${email} من الطلاب المعتمدين؟`)) {
             await db.collection("allowed_students").doc(email).delete();
         }
     }
 
-    // دالة الرفع الجماعي
     async function superSmartBulkAdd() {
         const input = document.getElementById("bulkInput").value.trim();
         if(!input) return alert("يرجى لصق البيانات");
@@ -272,7 +274,6 @@
         }
     }
 
-    // دالة نسخ جميع الطلاب
     async function copyAllStudents() {
         const rows = document.querySelectorAll("#studentsTable tbody tr");
         if(rows.length === 0) return alert("لا يوجد طلاب معتمدون للنسخ.");
