@@ -6,9 +6,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <style>
-        :root { --maroon: #800000; --gold: #d4af37; --bg: #fdfaf1; --danger: #c62828; --success: #28a745; --info: #17a2b8; }
+        :root { --maroon: #800000; --gold: #d4af37; --bg: #fdfaf1; --danger: #c62828; --success: #28a745; --info: #17a2b8; --warning: #f57c00; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); padding: 20px; }
-        .admin-card { background: white; max-width: 1000px; margin: auto; border-radius: 15px; padding: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 8px solid var(--maroon); }
+        .admin-card { background: white; max-width: 1050px; margin: auto; border-radius: 15px; padding: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 8px solid var(--maroon); }
         .header { text-align: center; border-bottom: 2px solid var(--gold); margin-bottom: 20px; padding-bottom: 10px; }
         .bulk-section { background: #f4f4f4; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px dashed var(--maroon); }
         textarea { width: 100%; height: 150px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-family: sans-serif; resize: vertical; box-sizing: border-box; }
@@ -28,6 +28,12 @@
         .btn-approve { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-reject { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
+        /* تنسيقات الأزرار الجديدة داخل الجدول */
+        .cell-content { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        .btn-sm { padding: 4px 8px; font-size: 0.85rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-copy-sm { background: var(--info); }
+        .btn-edit-sm { background: var(--warning); }
+
         .stats-bar { display: flex; justify-content: space-between; background: #e9ecef; padding: 15px; border-radius: 8px; font-weight: bold; color: var(--maroon); font-size: 1.1rem; margin-bottom: 15px; }
         .search-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 10px; }
         .search-container h3 { margin: 0; }
@@ -43,7 +49,7 @@
         <p>إدارة الطلاب المعتمدين ومراجعة طلبات التسجيل الجديدة</p>
     </div>
 
-    <!-- قسم الطلبات المعلقة (قائمة الانتظار المستقلة) -->
+    <!-- قسم الطلبات المعلقة -->
     <div class="pending-section" id="pendingSection">
         <h3>🔔 طلبات تسجيل جديدة بانتظار المراجعة</h3>
         <table id="pendingTable">
@@ -110,7 +116,7 @@
         const pendingTbody = document.querySelector("#pendingTable tbody");
         const pendingSection = document.getElementById("pendingSection");
 
-        // 1. مراقبة جدول الطلاب المعتمدين (الذي يقرأ منه الاختبار)
+        // 1. مراقبة جدول الطلاب المعتمدين
         db.collection("allowed_students").orderBy("name").onSnapshot((snapshot) => {
             let approvedCount = snapshot.size;
             approvedTbody.innerHTML = "";
@@ -119,17 +125,32 @@
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 const email = doc.id;
+                const safeName = data.name.replace(/'/g, "\\'");
+                
                 approvedTbody.innerHTML += `
                     <tr data-name="${data.name}" data-email="${email}">
-                        <td>${data.name}</td>
-                        <td>${email}</td>
+                        <td>
+                            <div class="cell-content">
+                                <span>${data.name}</span>
+                                <div>
+                                    <button class="btn-sm btn-copy-sm" onclick="copyText('${safeName}')" title="نسخ الاسم">📋 نسخ</button>
+                                    <button class="btn-sm btn-edit-sm" onclick="editStudentName('${email}', '${safeName}')" title="تعديل الاسم">✏️ تعديل</button>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-content">
+                                <span>${email}</span>
+                                <button class="btn-sm btn-copy-sm" onclick="copyText('${email}')" title="نسخ الإيميل">📋 نسخ</button>
+                            </div>
+                        </td>
                         <td><button class="btn-reject" onclick="deleteAllowed('${email}')">🗑️ حذف</button></td>
                     </tr>`;
             });
             searchStudents();
         });
 
-        // 2. مراقبة جدول الطلبات المعلقة (قائمة الانتظار)
+        // 2. مراقبة جدول الطلبات المعلقة
         db.collection("pending_students").orderBy("name").onSnapshot((snapshot) => {
             let pendingCount = snapshot.size;
             pendingTbody.innerHTML = "";
@@ -152,7 +173,38 @@
         });
     }
 
-    // دالة قبول الطالب (تنقله من الانتظار إلى مجموعة المعتمدين للاختبار)
+    // دالة عامة لنسخ نص مفرد مع إشعار سريع
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // إشعار خفيف أو رسالة سريعة
+            console.log("تم النسخ: " + text);
+        } catch (err) {
+            alert("فشل النسخ تلقائياً.");
+        }
+    }
+
+    // دالة تعديل اسم الطالب
+    async function editStudentName(email, currentName) {
+        const newName = prompt("أدخل الاسم الجديد للطالب:", currentName);
+        if (newName === null) return; // تم إلغاء الأمر
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            alert("لا يمكن ترك الاسم فارغاً.");
+            return;
+        }
+
+        try {
+            await db.collection("allowed_students").doc(email).update({
+                name: trimmedName
+            });
+            // التحديث سيظهر فوراً عبر الـ onSnapshot
+        } catch (error) {
+            alert("حدث خطأ أثناء تحديث الاسم.");
+        }
+    }
+
+    // دالة قبول الطالب
     async function approveStudent(email, name) {
         try {
             await db.collection("allowed_students").doc(email).set({
@@ -179,7 +231,7 @@
         }
     }
 
-    // دالة الرفع الجماعي (تضيف مباشرة للمعتمدين)
+    // دالة الرفع الجماعي
     async function superSmartBulkAdd() {
         const input = document.getElementById("bulkInput").value.trim();
         if(!input) return alert("يرجى لصق البيانات");
@@ -220,14 +272,13 @@
         }
     }
 
-    // دالة نسخ جميع الطلاب (الاسم في سطر والإيميل في سطر)
+    // دالة نسخ جميع الطلاب
     async function copyAllStudents() {
         const rows = document.querySelectorAll("#studentsTable tbody tr");
         if(rows.length === 0) return alert("لا يوجد طلاب معتمدون للنسخ.");
 
         let textToCopy = "";
         rows.forEach(row => {
-            // يتم أخذ النتائج الظاهرة فقط (لتدعم نتائج البحث إن وجدت، أو الكل)
             if (row.style.display !== "none") {
                 const name = row.getAttribute("data-name");
                 const email = row.getAttribute("data-email");
